@@ -4,41 +4,67 @@ import (
 	"api/src/banco"
 	"api/src/modelos"
 	"api/src/repositorio"
+	"api/src/respostas"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"strings"
 )
 
 func CriarUsuario(w http.ResponseWriter, r *http.Request) {
 	corpoRequest, erro := io.ReadAll(r.Body)
 	if erro != nil {
-		log.Fatal("erro no corpo request", erro)
+		respostas.Erro(w, http.StatusUnprocessableEntity, erro)
+		return
 	}
 
 	var usuario modelos.Usuario
 	if erro = json.Unmarshal(corpoRequest, &usuario); erro != nil {
-		log.Fatal("erro no unmarshal", erro)
+		respostas.Erro(w, http.StatusBadRequest, erro)
+		return
+	}
+
+	if erro = usuario.Preparar(); erro != nil {
+		respostas.Erro(w, http.StatusBadRequest, erro)
+		return
 	}
 
 	db, erro := banco.Conectar()
 	if erro != nil {
-		log.Fatal("erro em conectar com o banco", erro)
+		respostas.Erro(w, http.StatusInternalServerError, erro)
+		return
 	}
+	defer db.Close()
 
 	repositorio := repositorio.NovoRepositorioDeUsuarios(db)
-	repositorio.Criar(usuario)
-	usuarioId, erro := repositorio.Criar(usuario)
+	usuario.ID, erro = repositorio.Criar(usuario)
 	if erro != nil {
-		log.Fatal("erro em criar usuario", erro)
+		respostas.Erro(w, http.StatusInternalServerError, erro)
+		return
 	}
 
-	w.Write([]byte(fmt.Sprintf("Usuario inserido %d", usuarioId)))
+	respostas.JSON(w, http.StatusCreated, usuario)
 }
 
 func BuscarUsuario(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Buscando usuario"))
+	nomeOuNick := strings.ToLower(r.URL.Query().Get("usuario"))
+
+	db, erro := banco.Conectar()
+	if erro != nil {
+		respostas.Erro(w, http.StatusInternalServerError, erro)
+		return
+	}
+	defer db.Close()
+
+	repositorio := repositorio.NovoRepositorioDeUsuarios(db)
+	usuarios, erro := repositorio.Buscar(nomeOuNick)
+
+	if erro != nil {
+		respostas.Erro(w, http.StatusInternalServerError, erro)
+		return
+	}
+
+	respostas.JSON(w, http.StatusOK, usuarios)
 }
 
 func BuscarUsuarios(w http.ResponseWriter, r *http.Request) {
