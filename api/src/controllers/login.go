@@ -1,9 +1,12 @@
 package controllers
 
 import (
+	"api/src/autenticacao"
 	"api/src/banco"
 	"api/src/modelos"
+	"api/src/repositorio"
 	"api/src/respostas"
+	"api/src/seguranca"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -28,4 +31,18 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer db.Close()
+
+	repositorio := repositorio.NovoRepositorioDeUsuarios(db)
+	usuarioSalvoNoBanco, erro := repositorio.BuscarPorEmail(usuario.Email)
+	if erro != nil {
+		respostas.Erro(w, http.StatusInternalServerError, erro)
+		return
+	}
+
+	if erro = seguranca.VerificarSenha(usuarioSalvoNoBanco.Senha, usuario.Senha); erro != nil {
+		respostas.Erro(w, http.StatusInternalServerError, erro)
+		return
+	}
+
+	token,_ := autenticacao.CriarToken(usuarioSalvoNoBanco.ID)
 }
