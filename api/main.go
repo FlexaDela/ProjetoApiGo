@@ -8,10 +8,6 @@ import (
 	"net/http"
 )
 
-func init() {
-	
-}
-
 func main() {
 	config.Carregar()
 	fmt.Println(config.StringConexaoBanco)
